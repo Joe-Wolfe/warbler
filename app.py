@@ -111,11 +111,15 @@ def login():
 def logout():
     """Handle logout of user."""
 
-    # IMPLEMENT THIS
+    if CURR_USER_KEY in session:
+        do_logout()
+        flash("Successfully logged out.", "success")
 
+    return redirect("/login")
 
 ##############################################################################
 # General user routes:
+
 
 @app.route('/users')
 def list_users():
@@ -230,6 +234,7 @@ def delete_user():
 
 ##############################################################################
 # Messages routes:
+
 
 @app.route('/messages/new', methods=["GET", "POST"])
 def messages_add():
