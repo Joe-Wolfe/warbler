@@ -2,9 +2,10 @@ import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 
-from forms import UserAddForm, LoginForm, MessageForm
-from models import db, connect_db, User, Message
+from forms import UserAddForm, LoginForm, MessageForm, EditUserForm
+from models import db, connect_db, User, Message, Follows, Likes
 
 CURR_USER_KEY = "curr_user"
 
@@ -213,7 +214,28 @@ def stop_following(follow_id):
 def profile():
     """Update profile for current user."""
 
-    # IMPLEMENT THIS
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    form = EditUserForm(obj=g.user)
+
+    if form.validate_on_submit():
+
+        if User.authenticate(g.user.username, form.password.data):
+            g.user.username = form.username.data
+            g.user.email = form.email.data
+            g.user.image_url = form.image_url.data or User.image_url.default.arg
+            g.user.header_image_url = form.header_image_url.data or User.header_image_url.default.arg
+            g.user.bio = form.bio.data
+            g.user.location = form.location.data
+
+            db.session.commit()
+            return redirect(f"/users/{g.user.id}")
+
+        flash("Invalid password.", 'danger')
+
+    return render_template("users/edit.html", form=form)
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -231,6 +253,20 @@ def delete_user():
 
     return redirect("/signup")
 
+
+@app.route("/users/add_like/<int:msg_id>", methods=["POST"])
+def add_like(msg_id):
+    """Add a like for the currently-logged-in user."""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    liked_msg = Message.query.get_or_404(msg_id)
+    g.user.likes.append(liked_msg)
+    db.session.commit()
+
+    return redirect("/")
 
 ##############################################################################
 # Messages routes:
@@ -291,12 +327,15 @@ def homepage():
     """Show homepage:
 
     - anon users: no messages
-    - logged in: 100 most recent messages of followed_users
+    - logged in: 100 most recent messages of followed_users and the user
     """
 
     if g.user:
         messages = (Message
                     .query
+                    .filter(or_(Message.user_id.in_(db.session.query(Follows.user_being_followed_id).
+                                                    filter(Follows.user_following_id == g.user.id)),
+                            Message.user_id == g.user.id))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
