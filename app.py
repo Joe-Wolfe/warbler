@@ -268,6 +268,39 @@ def add_like(msg_id):
 
     return redirect("/")
 
+
+@app.route("/users/remove_like/<int:msg_id>", methods=["POST"])
+def remove_like(msg_id):
+    """Remove a like for the currently-logged-in user."""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    liked_msg = Message.query.get_or_404(msg_id)
+    g.user.likes.remove(liked_msg)
+    db.session.commit()
+
+    return redirect("/")
+
+
+@app.route("/users/<int:user_id>/likes")
+def show_likes(user_id):
+    """Show list of likes of this user."""
+
+    user = User.query.get_or_404(user_id)
+
+    # snagging messages in order from the database;
+    messages = (Message
+                .query
+                .filter(Message.id.in_(db.session.query(Likes.message_id).
+                                       filter(Likes.user_id == user_id)))
+                .order_by(Message.timestamp.desc())
+                .limit(100)
+                .all())
+
+    return render_template('users/likes.html', user=user, messages=messages)
+
 ##############################################################################
 # Messages routes:
 
