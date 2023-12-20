@@ -102,6 +102,7 @@ class UserModelTestCase(TestCase):
         self.assertEqual(len(u3.following), 0)
         self.assertEqual(u1.following[0].id, u2.id)
         self.assertEqual(u2.followers[0].id, u1.id)
+        self.assertNotEqual(u1.following[0].id, u3.id)
 
     def test_user_signup(self):
         test_user = User.signup("testuser", "test@test.com", "password", None)
@@ -115,6 +116,11 @@ class UserModelTestCase(TestCase):
         self.assertNotEqual(test_user_in_db.password, "password")
         self.assertTrue(test_user_in_db.password.startswith("$2b$"))
 
+    def test_user_invalid_username_signup(self):
+        test_user = User.signup(None, "", "password", None)
+        with self.assertRaises(IntegrityError):
+            db.session.commit()
+
     def test_user_authenticate(self):
 
         test_user = User.signup("testuser", "test@test.com", "password", None)
@@ -122,3 +128,15 @@ class UserModelTestCase(TestCase):
 
         self.assertIsNotNone(user)
         self.assertEqual(user.email, "test@test.com")
+
+    def test_user_invalid_username_authenticate(self):
+
+        test_user = User.signup("testuser", "test@test.com", "password", None)
+        user = User.authenticate("badusername", "password")
+        self.assertFalse(user)
+
+    def test_user_invalid_password_authenticate(self):
+
+        test_user = User.signup("testuser", "test@test.com", "password", None)
+        user = User.authenticate("testuser", "badpassword")
+        self.assertFalse(user)
